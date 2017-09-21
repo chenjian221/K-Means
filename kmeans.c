@@ -10,26 +10,69 @@
 #include<math.h>
 #include<time.h>
 
+// 2X2 Matrix
 
-int         num_items;
-int         num_attrs;
 double**     data; //all data points
 double**     centroids;  //the centroids
 double**     centroidsCopy;  //the copy of centroids
 
+int numItems;
+int numAttrs;
 
-void        inputFile();
-double**     malloc_matrix   (int a, int b);
-void        free_matrix     (int n, double **a);
-void        init_centroids          (int a);
-double      distance        (double a[],double b[],int num_attrs);
-void        form_cluster();
-void        copy_centroids();
-void        update_centroids();
-void        outputFile      (int k);
+void input_file(const char *fileName);
+void free_matrix(int n, double **a);
+void init_centroids(int k);
+void form_cluster(int a);
+void copy_centroids(int k);
+void update_centroids(int a);
+void output_file(int k);
+void restore(int k);
 
+double distance (double a[],double b[],int num_attrs);
+double** malloc_matrix   (int a, int b);
 
-void inputFile(const char * fileName)
+int main(int argc, const char * argv[])
+{
+
+	double euclidSum=0;//euclidSum is the sum of euclid distance between previous centroid and current centroid
+	if (argc != 4)
+	{
+        printf("You must have enter 3 input arguments\n");
+		return 1;
+	}
+    input_file(argv[1]);
+	int K = (int) strtol(argv[2], NULL, 10);
+    if(K > numItems){
+        printf("You cannot have K values that are greater than number of items\n");
+        return 2;
+    }
+	double threshold = strtod(argv[3],NULL);
+	int maxIteration  = 10;
+	init_centroids(K);
+	for(int time=0;time<=maxIteration;time++ )
+	{
+		form_cluster(K);
+		copy_centroids(K);
+		update_centroids(K);
+		for(int i=0;i<K;i++)
+		{
+			euclidSum+=distance(centroidsCopy[i],centroids[i],numAttrs);
+		}
+		if(euclidSum<threshold) // if the euclidSum is smaller than a defined threshold, the program ends
+		{
+			printf("the iteration number is:%d\n",time);
+			break;
+		}
+	}
+
+	restore(K);
+    output_file(K);
+
+	free_matrix(K,centroids);
+	free_matrix(K,centroidsCopy);
+	free_matrix(numItems,data);
+}
+void input_file(const char *fileName)
 {
 	FILE *ifp;
 	ifp = fopen(fileName, "r");
@@ -42,186 +85,147 @@ void inputFile(const char * fileName)
 		printf("This File is Empty\n");
 		fclose(ifp);
 	}
-	fscanf(ifp, "%d %d\n", &num_items, &num_attrs);
-	data=malloc_matrix(num_items, num_attrs);
-	for (int i=0; i<num_items; i++)
+	fscanf(ifp, "%d %d\n", &numItems, &numAttrs);
+
+	data=malloc_matrix(numItems, numAttrs);
+	for (int i=0; i<numItems; i++)
 	{
-		for (int j=0; j<num_attrs; j++)
-				{
-					fscanf(ifp, "%lf", &data[i][j]);
-				}
+		for (int j=0; j<numAttrs; j++)
+		{
+			fscanf(ifp, "%lf", &data[i][j]);
+		}
 	}
 }
 
-double **malloc_matrix(int a, int b)
+void  form_cluster(int a)
 {
-		    double **data1 = (double**)malloc(a*sizeof(double*));
-		    for(int i=0; i<a; i++)
-		    	data1[i] = (double*)malloc(b*sizeof(double));
-
-		    return data1;
+    double w;
+    double D,minD;
+    for (int i=0; i<numItems; i++)
+    {
+        w=0;
+        minD=distance(data[i],centroids[0],numAttrs);
+        for(int j=1; j<a; j++)
+        {
+            D=distance(data[i],centroids[j],numAttrs);
+            if (D<minD)
+            {
+                w=j;
+                minD=D;
+            }
+        }
+        data[i][numAttrs-1]=w; // problem
+    }
 }
 
 void free_matrix(int n, double **a)
 {
-	        for(int i=0; i<n; i++)
-	        	free(a[i]);
-	        free (a);
+	for(int i=0; i<n; i++)
+		free(a[i]);
+	free (a);
 }
 
-
-void outputFile(int k)
+void  init_centroids(int k)
 {
-	FILE *ofp1,*ofp2;
-	ofp1 = fopen("outputFile_clusters", "w");
-	fprintf(ofp1, "%d %d %d\n", num_items, num_attrs, k);
-	for (int i=0; i<num_items; i++)
-	{
-		for (int j=0; j<num_attrs; j++)
-				{
-					if(j==(num_attrs-1))
-						fprintf(ofp1, "%lf\n", data[i][j]);
-					else
-						fprintf(ofp1, "%lf", data[i][j]);
-				}
-		}
-	fclose(ofp1);
+    centroids = malloc_matrix(k, numAttrs);
+    centroidsCopy = malloc_matrix(k,numAttrs);
 
-	ofp2 = fopen("outputFile_centers", "w");
-	fprintf(ofp2, "%d %d %d\n", num_items, num_attrs, k);
-	for (int i=0; i<k; i++)
-	{
-			for (int j=0; j<num_attrs; j++)
-					{
-							fprintf(ofp1, "%lf", centroids[i][j]);
-					}
-			}
-		fclose(ofp2);
-}
-
-
-void  init_centroids(int a)
-{
-	 centroids=malloc_matrix(a, num_attrs);
-		for(int i=0; i<a; i++)
-		{
-			for(int j=0; j<num_attrs; j++)
-				centroids[i][j]=data[i][j];
-		}
-}
-
-
-
-double distance(double a*,double b*,int num_attrs)
-{
-	double sum=0;
-	double distance;
-	for(int i=0; i<num_attrs; i++)
-		sum+=sqr(a[i]-b[i]);
-	distance=sqrt(sum);
-	return distance;
-}
-
-/*
- * assign points to the nearest centroid
- * w refers to which cluster the point belongs
- */
-void  form_cluster(int a)
-{
-   double w;
-   double D,minD;
-   for (int i=0; i<num_items; i++)
-   {
-	   w=0;
-	   minD=distance(data[i],centroids[0],num_attrs);
-	   for(int j=1; j<a; j++)
-	   {
-		   D=distance(data[i],centroids[j],num_attrs);
-		   if (D<minD)
-		   {
-			   w=j;
-			   minD=D;
-		   }
-	   }
-		  data[i][num_attrs]=w;
-   }
+    for(int i=0; i<k; i++)
+        for(int j=0; j<numAttrs; j++)
+            centroids[i][j]=data[i][j];
 
 }
+
+void copy_centroids(int k){
+    for(int i=0; i<k; i++)
+        for(int j=0; j<numAttrs; j++)
+            centroidsCopy[i][j] = centroids[i][j];
+
+}
+
 
 /*
  * update new centroids
  */
 void update_centroids(int a)
 {
-	    int n;
-		double *sum;
-		sum=malloc(sizeof(double)*(num_attrs));
-		for(int i=0;i<a;i++)
+	double *sum;
+	sum=malloc(sizeof(double)*(numAttrs));
+	for(int i=0;i<a;i++)
+	{
+        int n = 0;
+        memset(sum,0, sizeof(sum[0])*numAttrs);
+		for(int j=0;j<numItems;j++)
 		{
-			n=0;
-			for(int k=0;k<num_attrs;k++)
-				sum[k]=0;
-			for(int j=0;j<num_items;j++)
+			if(data[j][numAttrs-1]==i)
 			{
-				if(data[j][num_attrs]==i)
+				n++;
+				for(int k=0;k<numAttrs;k++)
 				{
-					n++;
-					for(int k=0;k<num_attrs;k++)
-					{
-						sum[k]+=data[j][k];
-					}
+					sum[k]+=data[j][k];
 				}
 			}
-			for(int k=0;k<num_attrs;k++)
-			{
-				centroids[i][k]=sum[k]/n;
-			}
 		}
-		free(sum);
+		for(int k=0;k<numAttrs;k++)
+		{
+			centroids[i][k]=sum[k]/n;
+		}
+	}
+	free(sum);
 }
 
-void copy_centroids(int K){
-
-}
-void restore(int K){
-
-}
-int main(int argc, const char * argv[])
+double distance(double  a[], double  b[], int num_attrs)
 {
-	int time;
-	double sumC=0;//sumC is the sum of euclid distance between previous centroid and current centroid
-	if (argc != 4)
-	{
-		return 1;
-	}
-
-	//todo: read file
-	inputFile(argv[1]);
-	int K = (int) strtol(argv[2], NULL, 10);
-	// int maxIteration = (int) strtol(argv[2], NULL, 10);// read from file
-	int maxIteration  = 10000000;
-	double threshold = strtod(argv[3],NULL); // unsure
-
-	init_centroids(K);
-
-	for(time=0;time<=maxIteration;time++ )
-	{
-		form_cluster(K);
-		copy_centroids(K);
-		update_centroids(K);
-		for(int i=0;i<K;i++)
-		{
-			sumC+=distance(centroidsCopy[i],centroids[i],num_attrs);
-		}
-
-		if(sumC<threshold) // if the sumC is smaller than a defined threshold, the program ends
-		{
-			printf("the iteration number is:%d\n",time);
-			break;
-		}
-	}
-
-	restore(K);
-	outputFile(K);
+	double sum=0;
+	double distance;
+	for(int i=0; i<num_attrs; i++)
+		sum +=pow(a[i]-b[i],2);
+	distance=sqrt(sum);
+	return distance;
+}
+void restore(int k){
 
 }
+void output_file(int k)
+{
+	FILE *ofp1,*ofp2;
+	ofp1 = fopen("outputFile_clusters", "w");
+	fprintf(ofp1, "%d %d %d\n", numItems, numAttrs, k);
+	for (int i=0; i<numItems; i++)
+	{
+		for (int j=0; j<numAttrs; j++)
+		{
+            fprintf(ofp1, "%lf ", data[i][j]);
+		}
+        fprintf(ofp1, "\n");
+	}
+	fclose(ofp1);
+
+	ofp2 = fopen("outputFile_centers", "w");
+	fprintf(ofp2, "%d %d %d\n", numItems, numAttrs, k);
+	for (int i=0; i<k; i++)
+	{
+		for (int j=0; j<numAttrs; j++)
+		{
+			fprintf(ofp1, "%lf ", centroids[i][j]);
+		}
+        fprintf(ofp1, "\n");
+	}
+	fclose(ofp2);
+}
+
+
+
+double **malloc_matrix(int a, int b)
+{
+	double **data1 = (double**)malloc(a*sizeof(double*));
+	for(int i=0; i<a; i++)
+		data1[i] = (double*)malloc(b*sizeof(double));
+
+	return data1;
+}
+/*
+ * assign points to the nearest centroid
+ * w refers to which cluster the point belongs
+ */
+
