@@ -72,30 +72,6 @@ int main(int argc, const char * argv[])
 	free_matrix(K,centroidsCopy);
 	free_matrix(numItems,data);
 }
-void input_file(const char *fileName)
-{
-	FILE *ifp;
-	ifp = fopen(fileName, "r");
-	if(ifp==NULL)
-	{
-		printf("This File Cannot Be Open\n");
-	}
-	if(feof(ifp))
-	{
-		printf("This File is Empty\n");
-		fclose(ifp);
-	}
-	fscanf(ifp, "%d %d\n", &numItems, &numAttrs);
-
-	data=malloc_matrix(numItems, numAttrs);
-	for (int i=0; i<numItems; i++)
-	{
-		for (int j=0; j<numAttrs; j++)
-		{
-			fscanf(ifp, "%lf", &data[i][j]);
-		}
-	}
-}
 
 void  form_cluster(int a)
 {
@@ -114,35 +90,27 @@ void  form_cluster(int a)
                 minD=D;
             }
         }
-        data[i][numAttrs-1]=w; // problem
+        data[i][numAttrs]=w;
     }
-}
-
-void free_matrix(int n, double **a)
-{
-	for(int i=0; i<n; i++)
-		free(a[i]);
-	free (a);
 }
 
 void  init_centroids(int k)
 {
-    centroids = malloc_matrix(k, numAttrs);
-    centroidsCopy = malloc_matrix(k,numAttrs);
+    centroids = malloc_matrix(k, numAttrs + 1);
+    centroidsCopy = malloc_matrix(k,numAttrs + 1);
 
     for(int i=0; i<k; i++)
-        for(int j=0; j<numAttrs; j++)
+        for(int j=0; j<numAttrs + 1; j++)
             centroids[i][j]=data[i][j];
 
 }
 
 void copy_centroids(int k){
     for(int i=0; i<k; i++)
-        for(int j=0; j<numAttrs; j++)
+        for(int j=0; j<numAttrs + 1; j++)
             centroidsCopy[i][j] = centroids[i][j];
 
 }
-
 
 /*
  * update new centroids
@@ -157,7 +125,7 @@ void update_centroids(int a)
         memset(sum,0, sizeof(sum[0])*numAttrs);
 		for(int j=0;j<numItems;j++)
 		{
-			if(data[j][numAttrs-1]==i)
+			if(data[j][numAttrs]==i)
 			{
 				n++;
 				for(int k=0;k<numAttrs;k++)
@@ -183,9 +151,37 @@ double distance(double  a[], double  b[], int num_attrs)
 	distance=sqrt(sum);
 	return distance;
 }
+
 void restore(int k){
 
 }
+
+void input_file(const char *fileName)
+{
+    FILE *ifp;
+    ifp = fopen(fileName, "r");
+    if(ifp==NULL)
+    {
+        printf("This File Cannot Be Open\n");
+    }
+    if(feof(ifp))
+    {
+        printf("This File is Empty\n");
+        fclose(ifp);
+    }
+    fscanf(ifp, "%d %d\n", &numItems, &numAttrs);
+
+    data=malloc_matrix(numItems, numAttrs+1);
+    for (int i=0; i<numItems; i++)
+    {
+        for (int j=0; j<numAttrs; j++)
+        {
+            fscanf(ifp, "%lf", &data[i][j]);
+        }
+        data[i][numAttrs] = -1;
+    }
+}
+
 void output_file(int k)
 {
 	FILE *ofp1,*ofp2;
@@ -197,7 +193,7 @@ void output_file(int k)
 		{
             fprintf(ofp1, "%lf ", data[i][j]);
 		}
-        fprintf(ofp1, "\n");
+        fprintf(ofp1, "%lf\n",data[i][numAttrs]);
 	}
 	fclose(ofp1);
 
@@ -209,19 +205,23 @@ void output_file(int k)
 		{
 			fprintf(ofp1, "%lf ", centroids[i][j]);
 		}
-        fprintf(ofp1, "\n");
+        fprintf(ofp1, "%lf\n",centroids[i][numAttrs]);
 	}
 	fclose(ofp2);
 }
 
+void free_matrix(int n, double **a)
+{
+    for(int i=0; i<n; i++)
+        free(a[i]);
+    free (a);
+}
 
-
-double **malloc_matrix(int a, int b)
+double ** malloc_matrix(int a, int b)
 {
 	double **data1 = (double**)malloc(a*sizeof(double*));
 	for(int i=0; i<a; i++)
 		data1[i] = (double*)malloc(b*sizeof(double));
-
 	return data1;
 }
 /*
